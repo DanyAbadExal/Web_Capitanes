@@ -30,34 +30,51 @@ const dbConfig = {
 };
 
 // 1. RUTA DE LOGIN REFORMADA CON COMPARACIÓN SEGURA (BCRYPT)
-app.post('/login', async (req, res) => {
+app.post('/api/login', async (req, res) => {
+    const username = String(req.body.username).trim();
+    const password = String(req.body.password).trim();
+    const userIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+
     try {
-        // 1. Forzamos a que ambos campos sean tratados estrictamente como texto/string
-        const usernameInput = String(req.body.username).trim();
-        const passwordInput = String(req.body.password).trim();
+        let pool = await sql.connect(dbConfig);
+        
+        // Buscamos al usuario únicamente por su DNI (username) para traer su hash
+        let result = await pool.request()
+            .input('inputUser', sql.VarChar, username)
+            .query('SELECT username, password, nombre, apellido, posicion, celular, embarcacion FROM Usuarios WHERE username = @inputUser');
 
-        // 2. Buscamos al usuario en Azure SQL
-        const user = await db.buscarUsuario(usernameInput); // Ajusta a tu función real de BD
+        if (result.recordset.length > 0) {
+            const user = result.recordset[0];
 
-        if (!user) {
-            return res.status(401).render('login', { error: 'Usuario no encontrado' });
+            // 2. Comparamos la contraseña web con el hash seguro guardado en la BD
+            const contraseniaCorrecta = await bcrypt.compare(password, user.password);
+
+            if (contraseniaCorrecta) {
+                // Formateamos la información requerida para la cabecera web
+                const identificadorPantalla = `${user.nombre} ${user.apellido} | EP: ${user.embarcacion}`;
+
+                // REGISTRO EN LA TABLA DE HISTORIAL DE AZURE
+                await pool.request()
+                    .input('username', sql.VarChar, user.username)
+                    .input('ip', sql.VarChar, userIp)
+                    .query('INSERT INTO HistorialAccesos (username, ip_cliente) VALUES (@username, @ip)');
+
+                // Guardamos la sesión en la cookie
+                res.cookie('session_user', identificadorPantalla, { 
+                    httpOnly: true, 
+                    secure: process.env.NODE_ENV === 'production' 
+                });
+                
+                return res.json({ success: true });
+            }
         }
+        
+        // Por seguridad, devolvemos el mismo error si el usuario no existe o si la clave está mal
+        return res.json({ success: false, message: 'Usuario o contraseña incorrectos.' });
 
-        // 3. LA SOLUCIÓN: Doble validación (Bypass de DNI o validación Bcrypt)
-        const esMismoDNI = (usernameInput === passwordInput);
-        const esValidoBcrypt = await bcrypt.compare(passwordInput, user.password).catch(() => false);
-
-        if (esMismoDNI || esValidoBcrypt) {
-            // ¡Acceso concedido! Creamos la sesión
-            req.session.usuario = user; 
-            return res.redirect('/panel'); // Ajusta a tu ruta del iFrame de barcos
-        } else {
-            return res.status(401).render('login', { error: 'Contraseña incorrecta' });
-        }
-
-    } catch (error) {
-        console.error('Error en el login:', error);
-        res.status(500).send('Error interno del servidor');
+    } catch (err) {
+        console.error('⚠️ Error de conexión con Azure SQL:', err.message);
+        return res.status(500).json({ success: false, message: 'Error de comunicación con la base de datos de Azure.' });
     }
 });
 
