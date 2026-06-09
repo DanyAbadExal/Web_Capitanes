@@ -1,4 +1,4 @@
-// Despliegue de producción v1.0.1 - Control de Flota
+// Despliegue de producción v1.0.2 - Control de Flota
 require('dotenv').config();
 const express = require('express');
 const sql = require('mssql'); 
@@ -29,7 +29,7 @@ const dbConfig = {
     }
 };
 
-// 1. RUTA DE LOGIN REFORMADA CON COMPARACIÓN SEGURA (BCRYPT)
+// 1. RUTA DE LOGIN REFORMADA CON DOBLE VALIDACIÓN (DNI O BCRYPT)
 app.post('/api/login', async (req, res) => {
     const username = String(req.body.username).trim();
     const password = String(req.body.password).trim();
@@ -46,10 +46,15 @@ app.post('/api/login', async (req, res) => {
         if (result.recordset.length > 0) {
             const user = result.recordset[0];
 
-            // 2. Comparamos la contraseña web con el hash seguro guardado en la BD
-            const contraseniaCorrecta = await bcrypt.compare(password, user.password);
+            // =========================================================================
+            // SOLUCIÓN AL DESAFÍO DE CONTRASEÑA NUMÉRICA (DNI)
+            // Condición A: El usuario escribió exactamente su DNI en el campo clave.
+            // Condición B: La contraseña ingresada coincide con el Hash de Bcrypt en BD.
+            // =========================================================================
+            const esMismoDNI = (username === password); 
+            const contraseniaCorrectaBcrypt = await bcrypt.compare(password, user.password).catch(() => false);
 
-            if (contraseniaCorrecta) {
+            if (esMismoDNI || contraseniaCorrectaBcrypt) {
                 // Formateamos la información requerida para la cabecera web
                 const identificadorPantalla = `${user.nombre} ${user.apellido} | EP: ${user.embarcacion}`;
 
