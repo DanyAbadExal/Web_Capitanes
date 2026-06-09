@@ -205,14 +205,17 @@
             font-weight: 700;
         }
 
+        /* DISEÑO REFORMADO PARA NOMBRE DE PATRÓN + EMBARCACIÓN */
         .user-tag {
             font-size: 0.85rem;
-            color: var(--text-secondary);
-            background: rgba(255, 255, 255, 0.05);
-            padding: 6px 12px;
-            border-radius: 20px;
+            font-weight: 600;
+            color: #38bdf8; /* Azul cyan brillante enfocado en perfil */
+            background: rgba(56, 189, 248, 0.08);
+            padding: 8px 16px;
+            border-radius: 8px;
             margin-right: 15px;
-            border: 1px solid rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(56, 189, 248, 0.2);
+            letter-spacing: 0.3px;
         }
 
         .header-actions {
@@ -300,7 +303,7 @@
             <header>
                 <h1>Análisis Flota - Centro Control (Patrones Propia)</h1>
                 <div class="header-actions">
-                    <span class="user-tag" id="user-display">Op: ----</span>
+                    <span class="user-tag" id="user-display">Cargando perfil...</span>
                     <button class="btn-fullscreen" onclick="toggleFullScreen()">Pantalla Completa</button>
                 </div>
             </header>
@@ -319,7 +322,6 @@
             const errorTxt = document.getElementById('error-txt');
 
             try {
-                // Llama al endpoint real de Node.js que procesa el login e historial
                 const response = await fetch('/api/login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -343,7 +345,6 @@
 
         async function loadDashboard() {
             try {
-                // Solicita de forma segura al backend las URLs configuradas
                 const response = await fetch('/api/report-config');
                 if(!response.ok) throw new Error();
                 
@@ -352,19 +353,18 @@
                 if(data.success) {
                     const iframe = document.getElementById('powerbi-iframe');
                     
-                    // Limpieza del iframe para forzar el salto directo a la Hoja 9
                     iframe.src = "about:blank"; 
                     
                     setTimeout(() => {
                         iframe.src = data.iframeUrl; 
                     }, 100);
 
-                    document.getElementById('user-display').innerText = `Op: ${data.username}`;
+                    // Mapeo directo del identificador de pantalla sin prefijos estáticos
+                    document.getElementById('user-display').innerText = data.username;
                     document.getElementById('login-box').style.display = 'none';
                     document.getElementById('dashboard-box').style.display = 'flex';
                 }
             } catch (err) {
-                // Si no hay sesión válida, se mantiene en la pantalla de login
                 document.getElementById('login-box').style.display = 'block';
                 document.getElementById('dashboard-box').style.display = 'none';
             }
@@ -375,7 +375,6 @@
             window.location.reload();
         }
 
-        // Permite presionar Enter en el teclado para ingresar
         document.addEventListener('keypress', function (e) {
             if (e.key === 'Enter') { validateLogin(); }
         });
@@ -389,7 +388,6 @@
             }
         }
 
-        // Al abrir la página, verifica automáticamente si ya existía una sesión activa
         window.onload = loadDashboard;
     </script>
 </body>

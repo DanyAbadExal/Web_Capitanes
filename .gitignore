@@ -1,2 +1,5 @@
 node_modules/
 .env
+generar-hash.js
+crear-usuarios-masivo.js
+insertar_usuarios.sql
